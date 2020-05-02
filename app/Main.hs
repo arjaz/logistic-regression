@@ -1,6 +1,7 @@
 module Main where
 
+import Data.Matrix
 import Lib
 
 main :: IO ()
-main = someFunc
+main = putStrLn "Hw"

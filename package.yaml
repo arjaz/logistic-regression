@@ -6,6 +6,8 @@ maintainer:          "arjaz@protonmail.com"
 
 dependencies:
 - base >= 4.7 && < 5
+- matrix
+- vector
 
 library:
   source-dirs: src
