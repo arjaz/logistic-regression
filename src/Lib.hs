@@ -46,32 +46,29 @@ cost as ys = mean $ V.zipWith loss (getRow 1 as) (getRow 1 ys)
 -- xss - dataset of (feature number, example number) shape
 -- as - dataset of (1, example number) shape
 -- ys - dataset of (1, example number) shape
-weightDerivation :: Matrix Double -> Matrix Double -> Matrix Double -> Double
-weightDerivation xss as ys =
-  mean $
+weightDerivations ::
+     Matrix Double -> Matrix Double -> Matrix Double -> Matrix Double
+weightDerivations xss as ys =
+  fmap (/ (fromIntegral $ ncols xss)) $
   matrixProduct xss $
-  transpose $
-  fromList 1 (V.length $ getRow 1 xss) $ zipWith (-) (toList as) (toList ys)
+  transpose $ fromList 1 (ncols xss) $ zipWith (-) (toList as) (toList ys)
 
 -- dJ / db = mean (a - y)
 -- as - dataset of (1, example number) shape
 -- ys - dataset of (1, example number) shape
--- biasDerivation :: Floating a => V.Vector a -> V.Vector a -> a
 biasDerivation :: Floating a => Matrix a -> Matrix a -> a
 biasDerivation as ys = mean $ V.zipWith (-) (getRow 1 as) (getRow 1 ys)
 
-forPropagation ::
-     Matrix Double -> Double -> Matrix Double -> Matrix Double -> Matrix Double
-forPropagation ws b xss ys = as
+forPropagation :: Matrix Double -> Double -> Matrix Double -> Matrix Double
+forPropagation ws b xss = as
   where
     as = answers xss ws b
-    costVal = cost as ys
 
 backPropagation ::
-     Matrix Double -> Matrix Double -> Matrix Double -> (Double, Double)
-backPropagation xss as ys = (dw, db)
+     Matrix Double -> Matrix Double -> Matrix Double -> (Matrix Double, Double)
+backPropagation xss as ys = (dws, db)
   where
-    dw = weightDerivation xss as ys
+    dws = weightDerivations xss as ys
     db = biasDerivation as ys
 
 propagation ::
@@ -79,13 +76,13 @@ propagation ::
   -> Double
   -> Matrix Double
   -> Matrix Double
-  -> (Double, Double)
-propagation ws b xss ys = (dw, db)
+  -> (Matrix Double, Double)
+propagation ws b xss ys = (dws, db)
   where
-    as = forPropagation ws b xss ys
-    (dw, db) = backPropagation xss as ys
+    as = forPropagation ws b xss
+    (dws, db) = backPropagation xss as ys
 
--- -> (ws, b, dw, db)
+-- -> (ws, b, dws, db, iterations)
 descent ::
      Matrix Double
   -> Double
@@ -94,14 +91,16 @@ descent ::
   -> Double
   -> Int
   -> Int
-  -> (Matrix Double, Double, Double, Double, Int)
+  -> (Matrix Double, Double, Matrix Double, Double)
 descent ws b xss ys rate iterations iteration =
   if iteration >= iterations
-    then (newWs, newB, dw, db, iteration)
+    then (newWs, newB, dws, db)
     else descent newWs newB xss ys rate iterations (iteration + 1)
   where
-    (dw, db) = propagation ws b xss ys
-    newWs = (-) (rate * dw) <$> ws
+    (dws, db) = propagation ws b xss ys
+    newWs =
+      fromList (nrows ws) (ncols ws) $
+      zipWith (-) (toList ws) ((* rate) <$> toList dws)
     newB = b - rate * db
 
 prediction :: Matrix Double -> Matrix Double -> Double -> Matrix Double
@@ -119,18 +118,16 @@ model ::
   -> Matrix Double
   -> Int
   -> Double
-  -> (Matrix Double, Matrix Double, Matrix Double, Double, Int)
+  -> (Matrix Double, Matrix Double, Matrix Double, Double)
 model xssTrain ysTrain xssTest ysTest iterations rate =
-  (yTestPrediction, yTrainPrediction, ws, b, iters)
+  (yTestPrediction, yTrainPrediction, ws, b)
   where
     yTestPrediction = prediction xssTest ws b
     yTrainPrediction = prediction xssTrain ws b
-    initWs = matrix (V.length $ getCol 1 xssTrain) 1 $ const 0
+    initWs =
+      matrix
+        (V.length $ getCol 1 xssTrain)
+        1
+        (\(i, j) -> fromIntegral (i + j) * 0.01)
     initB = 0
-    (ws, b, dw, db, iters) =
-      descent initWs initB xssTrain ysTrain rate iterations 0
-
-getXor :: (Matrix Double, Matrix Double)
-getXor =
-  ( transpose $ fromLists [[0, 0], [0, 1], [1, 0], [1, 1]]
-  , fromLists [[0, 1, 1, 0]])
+    (ws, b, dw, db) = descent initWs initB xssTrain ysTrain rate iterations 0
