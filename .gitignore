@@ -1,3 +1,3 @@
-neural.cabal
+*.cabal
 .stack-work/
 *~
