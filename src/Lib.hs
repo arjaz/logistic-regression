@@ -6,10 +6,26 @@ module Lib
 import Data.Matrix
 import qualified Data.Vector as V
 
--- xs - dataset of (featur number, 1) shape
--- ws - dataset of (featur number, 1) shape
-scalarProduct :: Num a => Matrix a -> Matrix a -> a
-scalarProduct xs ws = sum $ V.zipWith (*) (getCol 1 xs) (getCol 1 ws)
+-- X
+type Features = Matrix Double
+
+-- Y
+type Outputs = Matrix Double
+
+-- A
+type Activations = Matrix Double
+
+-- W
+type Weights = Matrix Double
+
+-- dW
+type WeightsDerivatives = Matrix Double
+
+-- b
+type Bias = Double
+
+-- db
+type BiasDerivative = Double
 
 matrixProduct :: Num a => Matrix a -> Matrix a -> Matrix a
 matrixProduct = multStd2
@@ -29,25 +45,17 @@ sigmoid x = 1 / (1 + e)
 -- as - dataset of (1, example number) shape
 -- xss - dataset of (feature number, example number) shape
 -- ws - dataset of (feature number, 1) shape
-answers :: Matrix Double -> Matrix Double -> Double -> Matrix Double
+answers :: Features -> Weights -> Bias -> Activations
 answers xss ws b = activation . (+ b) <$> matrixProduct (transpose ws) xss
 
-loss :: Floating a => a -> a -> a
-loss a y = -y * log a - (1 - y) * log (1 - a)
-
+-- loss a y = -y * log a - (1 - y) * log (1 - a)
 -- j = mean [loss a y]
--- as - dataset of (1, example number) shape
--- ys - dataset of (1, example number) shape
-cost :: Floating a => Matrix a -> Matrix a -> a
-cost as ys = mean $ V.zipWith loss (getRow 1 as) (getRow 1 ys)
-
 -- dJ / dw = 1/m X * (A - Y).T
 -- where * is a matrix product
 -- xss - dataset of (feature number, example number) shape
 -- as - dataset of (1, example number) shape
 -- ys - dataset of (1, example number) shape
-weightDerivations ::
-     Matrix Double -> Matrix Double -> Matrix Double -> Matrix Double
+weightDerivations :: Features -> Activations -> Outputs -> WeightsDerivatives
 weightDerivations xss as ys =
   fmap (/ (fromIntegral $ ncols xss)) $
   matrixProduct xss $
@@ -56,48 +64,48 @@ weightDerivations xss as ys =
 -- dJ / db = mean (a - y)
 -- as - dataset of (1, example number) shape
 -- ys - dataset of (1, example number) shape
-biasDerivation :: Floating a => Matrix a -> Matrix a -> a
+biasDerivation :: Activations -> Outputs -> BiasDerivative
 biasDerivation as ys = mean $ V.zipWith (-) (getRow 1 as) (getRow 1 ys)
 
-forPropagation :: Matrix Double -> Double -> Matrix Double -> Matrix Double
-forPropagation ws b xss = as
+forPropagation :: Features -> Weights -> Bias -> Activations
+forPropagation xss ws b = as
   where
     as = answers xss ws b
 
 backPropagation ::
-     Matrix Double -> Matrix Double -> Matrix Double -> (Matrix Double, Double)
+     Features -> Activations -> Outputs -> (WeightsDerivatives, BiasDerivative)
 backPropagation xss as ys = (dws, db)
   where
     dws = weightDerivations xss as ys
     db = biasDerivation as ys
 
 propagation ::
-     Matrix Double
-  -> Double
-  -> Matrix Double
-  -> Matrix Double
-  -> (Matrix Double, Double)
-propagation ws b xss ys = (dws, db)
+     Features
+  -> Weights
+  -> Bias
+  -> Outputs
+  -> (WeightsDerivatives, BiasDerivative)
+propagation xss ws b ys = (dws, db)
   where
-    as = forPropagation ws b xss
+    as = forPropagation xss ws b
     (dws, db) = backPropagation xss as ys
 
 -- -> (ws, b, dws, db, iterations)
 descent ::
-     Matrix Double
-  -> Double
-  -> Matrix Double
-  -> Matrix Double
+     Features
+  -> Weights
+  -> Bias
+  -> Outputs
   -> Double
   -> Int
   -> Int
-  -> (Matrix Double, Double, Matrix Double, Double)
-descent ws b xss ys rate iterations iteration =
+  -> (Weights, Bias, WeightsDerivatives, BiasDerivative)
+descent xss ws b ys rate iterations iteration =
   if iteration >= iterations
     then (newWs, newB, dws, db)
-    else descent newWs newB xss ys rate iterations (iteration + 1)
+    else descent xss newWs newB ys rate iterations (iteration + 1)
   where
-    (dws, db) = propagation ws b xss ys
+    (dws, db) = propagation xss ws b ys
     newWs =
       fromList (nrows ws) (ncols ws) $
       zipWith (-) (toList ws) ((* rate) <$> toList dws)
@@ -112,13 +120,13 @@ prediction xss ws b =
   answers xss ws b
 
 model ::
-     Matrix Double
-  -> Matrix Double
-  -> Matrix Double
-  -> Matrix Double
+     Features
+  -> Outputs
+  -> Features
+  -> Outputs
   -> Int
   -> Double
-  -> (Matrix Double, Matrix Double, Matrix Double, Double)
+  -> (Outputs, Outputs, Weights, Bias)
 model xssTrain ysTrain xssTest ysTest iterations rate =
   (yTestPrediction, yTrainPrediction, ws, b)
   where
@@ -130,4 +138,4 @@ model xssTrain ysTrain xssTest ysTest iterations rate =
         1
         (\(i, j) -> fromIntegral (i + j) * 0.01)
     initB = 0
-    (ws, b, dw, db) = descent initWs initB xssTrain ysTrain rate iterations 0
+    (ws, b, dw, db) = descent xssTrain initWs initB ysTrain rate iterations 0
