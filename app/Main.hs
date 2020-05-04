@@ -23,16 +23,19 @@ main = do
   let xss = fst getOr
   let ys = snd getOr
   putStrLn "X:"
-  putStrLn $ prettyMatrix $ xToMatrix xss
+  let Features xMatrix = xss
+  let Outputs yMatrix = ys
+  putStrLn $ prettyMatrix xMatrix
   putStrLn "Y:"
-  putStrLn $ prettyMatrix $ yToMatrix ys
+  putStrLn $ prettyMatrix yMatrix
   let iterations = 1000
   let rate = 0.05
-  let (predictions, _, ws, b) = model xss ys xss ys iterations rate
+  let (Outputs predictions, _, Weights ws, Bias b) =
+        model xss ys xss ys iterations rate
   putStrLn $
     "Predictions using " ++
     show iterations ++ " iterations with learning rate " ++ show rate ++ ":"
-  putStrLn $ prettyMatrix $ yToMatrix predictions
+  putStrLn $ prettyMatrix predictions
   putStrLn "Weights:"
-  putStrLn $ prettyMatrix $ wToMatrix ws
-  putStrLn $ "Bias: " ++ show (bToDouble b)
+  putStrLn $ prettyMatrix ws
+  putStrLn $ "Bias: " ++ show b

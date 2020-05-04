@@ -4,10 +4,6 @@ module Lib
   , Outputs(..)
   , Weights(..)
   , Bias(..)
-  , xToMatrix
-  , yToMatrix
-  , wToMatrix
-  , bToDouble
   ) where
 
 import Data.Matrix
@@ -17,50 +13,29 @@ import qualified Data.Vector as V
 newtype Features =
   Features (Matrix Double)
 
-xToMatrix :: Features -> Matrix Double
-xToMatrix (Features m) = m
-
 -- Y
 newtype Outputs =
   Outputs (Matrix Double)
-
-yToMatrix :: Outputs -> Matrix Double
-yToMatrix (Outputs m) = m
 
 -- A
 newtype Activations =
   Activations (Matrix Double)
 
-aToMatrix :: Activations -> Matrix Double
-aToMatrix (Activations m) = m
-
 -- W
 newtype Weights =
   Weights (Matrix Double)
-
-wToMatrix :: Weights -> Matrix Double
-wToMatrix (Weights m) = m
 
 -- dW
 newtype WeightsDerivatives =
   WeightsDerivatives (Matrix Double)
 
-dwToMatrix :: WeightsDerivatives -> Matrix Double
-dwToMatrix (WeightsDerivatives m) = m
-
 -- b
 newtype Bias =
   Bias Double
 
-bToDouble :: Bias -> Double
-bToDouble (Bias d) = d
-
 -- db
 newtype BiasDerivative =
   BiasDerivative Double
-
-dbToDouble :: BiasDerivative -> Double
-dbToDouble (BiasDerivative d) = d
 
 matrixProduct :: Num a => Matrix a -> Matrix a -> Matrix a
 matrixProduct = multStd2
@@ -85,9 +60,9 @@ answers xss ws b =
   Activations $
   activation . (+ bDouble) <$> matrixProduct (transpose wsMatrix) xMatrix
   where
-    xMatrix = xToMatrix xss
-    bDouble = bToDouble b
-    wsMatrix = wToMatrix ws
+    Features xMatrix = xss
+    Bias bDouble = b
+    Weights wsMatrix = ws
 
 -- loss a y = -y * log a - (1 - y) * log (1 - a)
 -- j = mean [loss a y]
@@ -101,11 +76,12 @@ weightsDerivatives xss as ys =
   WeightsDerivatives $
   fmap (/ (fromIntegral $ ncols xMatrix)) $
   matrixProduct xMatrix $
-  transpose $ fromList 1 (ncols xMatrix) $ zipWith (-) asList ysList
+  transpose $
+  fromList 1 (ncols xMatrix) $ zipWith (-) (toList asList) (toList ysList)
   where
-    xMatrix = xToMatrix xss
-    asList = toList $ aToMatrix as
-    ysList = toList $ yToMatrix ys
+    Features xMatrix = xss
+    Activations asList = as
+    Outputs ysList = ys
 
 -- dJ / db = mean (a - y)
 -- as - dataset of (1, example number) shape
@@ -114,8 +90,8 @@ biasDerivative :: Activations -> Outputs -> BiasDerivative
 biasDerivative as ys =
   BiasDerivative $ mean $ V.zipWith (-) (getRow 1 asMatrix) (getRow 1 ysMatrix)
   where
-    asMatrix = aToMatrix as
-    ysMatrix = yToMatrix ys
+    Activations asMatrix = as
+    Outputs ysMatrix = ys
 
 forPropagation :: Features -> Weights -> Bias -> Activations
 forPropagation xss ws b = as
@@ -161,10 +137,10 @@ descent xss ws b ys rate iterations iteration =
       fromList (nrows wsMatrix) (ncols wsMatrix) $
       zipWith (-) (toList wsMatrix) ((* rate) <$> toList dwsMatrix)
     newB = Bias $ bDouble - rate * dbDouble
-    wsMatrix = wToMatrix ws
-    dwsMatrix = dwToMatrix dws
-    bDouble = bToDouble b
-    dbDouble = dbToDouble db
+    Weights wsMatrix = ws
+    WeightsDerivatives dwsMatrix = dws
+    Bias bDouble = b
+    BiasDerivative dbDouble = db
 
 prediction :: Features -> Weights -> Bias -> Outputs
 prediction xss ws b =
@@ -173,7 +149,9 @@ prediction xss ws b =
      if x >= 0.5
        then 1
        else 0) <$>
-  aToMatrix (answers xss ws b)
+  aMatrix
+  where
+    Activations aMatrix = answers xss ws b
 
 model ::
      Features
@@ -196,4 +174,4 @@ model xssTrain ysTrain xssTest ysTest iterations rate =
         (\(i, j) -> fromIntegral (i + j) * 0.01)
     initB = Bias 0
     (ws, b, dw, db) = descent xssTrain initWs initB ysTrain rate iterations 0
-    xTrainMatrix = xToMatrix xssTrain
+    Features xTrainMatrix = xssTrain
