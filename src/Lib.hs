@@ -168,10 +168,7 @@ model xssTrain ysTrain xssTest ysTest iterations rate =
     yTrainPrediction = prediction xssTrain ws b
     initWs =
       Weights $
-      matrix
-        (V.length $ getCol 1 xTrainMatrix)
-        1
-        (\(i, j) -> fromIntegral (i + j) * 0.01)
+      matrix (nrows xTrainMatrix) 1 (\(i, j) -> fromIntegral (i + j) * 0.01)
     initB = Bias 0
     (ws, b, dw, db) = descent xssTrain initWs initB ysTrain rate iterations 0
     Features xTrainMatrix = xssTrain
