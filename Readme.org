@@ -1,2 +1,2 @@
 * Haskell Logistic Regression
-In this project I try (and achieve) to implement Logistic Regression in Haskell from the scratch.
+In this project I try (and achieve) to implement Logistic Regression in Haskell from scratch.
